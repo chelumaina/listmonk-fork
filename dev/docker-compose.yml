@@ -20,7 +20,7 @@ services:
   db:
     image: postgres:13
     ports:
-      - "5432:5432"
+      - "5440:5432"
     networks:
       - listmonk-dev
     environment:
@@ -29,14 +29,12 @@ services:
       - POSTGRES_DB=listmonk-dev
     restart: unless-stopped
     volumes:
-      - type: volume
-        source: listmonk-dev-db
-        target: /var/lib/postgresql/data
+      - ./listmonk-dev-db:/var/lib/postgresql/data
 
   front:
     build:
-      context: ../
-      dockerfile: dev/app.Dockerfile
+      context: .
+      dockerfile: app.Dockerfile
     command: ["make", "run-frontend"]
     ports:
       - "8080:8080"
@@ -51,21 +49,60 @@ services:
 
   backend:
     build:
-      context: ../
-      dockerfile: dev/app.Dockerfile
-    command: ["make", "run-backend-docker"]
+      context: .
+      dockerfile: app.Dockerfile
+    # command: ["make", "run-backend-docker"]
+    command: [sh, -c, "./listmonk --install --idempotent --yes --config /listmonk/config.toml && ./listmonk --upgrade --yes --config /listmonk/config.toml && ./listmonk --config /listmonk/config.toml"]
+
     ports:
       - "9000:9000"
     depends_on:
       - db
+
     volumes:
       - ../:/app
-      - $GOPATH/pkg/mod/cache:/go/pkg/mod/cache
+      - ./pkg/mod/cache:/go/pkg/mod/cache 
+      - ./config.toml:/listmonk/config.toml
     networks:
       - listmonk-dev
 
-volumes:
-  listmonk-dev-db:
+
+  # proxy:
+  #   container_name: proxy
+  #   hostname: 'proxy'
+  #   restart: always
+  #   image: "nginx:latest"
+  #   command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+  #   volumes:
+  #     - ../nginx/conf:/etc/nginx/conf.d
+  #     - ../:/usr/src/app/
+  #     - ../nginx/logs:/var/log/nginx/ 
+  #     - ../data/certbot/conf:/etc/letsencrypt
+  #     - ../data/certbot/www:/var/www/certbot
+  #   #- ./logs:/var/log/proxy
+  #   networks:
+  #     - listmonk-dev
+  #   ports:
+  #     - 88:80
+  #     # - 443:443
+  #   depends_on: 
+  #     - front  
+
+  # certbot:
+  #   container_name: certbot
+  #   hostname: 'certbot'
+  #   image: certbot/certbot
+  #   volumes: 
+  #     - ../data/certbot/conf:/etc/letsencrypt
+  #     - ../data/certbot/www:/var/www/certbot
+  #   #- ./logs:/var/log/certbot
+  #   entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 48h & wait $${!}; done;'"
+  #   depends_on: 
+  #     - proxy
+  #     - front
+  #   networks:
+  #     - listmonk-dev
+ 
 
 networks:
   listmonk-dev:

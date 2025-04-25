@@ -250,7 +250,7 @@ func newConfigFile(path string) error {
 	// Initialize the static file system into which all
 	// required static assets (.sql, .js files etc.) are loaded.
 	fs := initFS(appDir, "", "", "")
-	b, err := fs.Read("config.toml.sample")
+	b, err := fs.Read("config.toml")
 	if err != nil {
 		return fmt.Errorf("error reading sample config (is binary stuffed?): %v", err)
 	}

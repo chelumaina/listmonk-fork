@@ -1,19 +1,23 @@
 x-db-credentials: &db-credentials                             # Use the default POSTGRES_ credentials if they're available or simply default to "listmonk"
-  POSTGRES_USER: &db-user listmonk                            # for database user, password, and database name
-  POSTGRES_PASSWORD: &db-password listmonk
-  POSTGRES_DB: &db-name listmonk
+  POSTGRES_USER: &db-user listmonk_user                            # for database user, password, and database name
+  POSTGRES_PASSWORD: &db-password listM0nk$$8
+  POSTGRES_DB: &db-name listmonk_db
 
 services:
   # listmonk app
-  app:
-    image: listmonk/listmonk:latest
+  listmonk_app:
+    # image: listmonk/listmonk:latest 
+    build:
+      context: .
+      dockerfile: Dockerfile
+
     container_name: listmonk_app
+    hostname: "listmonk_app"
     restart: unless-stopped
     ports:
-      - "9000:9000"                                           # To change the externally exposed port, change to: $custom_port:9000
+      - "9009:9000"                                           # To change the externally exposed port, change to: $custom_port:9000
     networks:
       - listmonk
-    hostname: listmonk.example.com                            # Recommend using FQDN for hostname
     depends_on:
       - db
     command: [sh, -c, "./listmonk --install --idempotent --yes --config '' && ./listmonk --upgrade --yes --config '' && ./listmonk --config ''"]
@@ -37,31 +41,91 @@ services:
       LISTMONK_ADMIN_PASSWORD: ${LISTMONK_ADMIN_PASSWORD:-}   # Otherwise, the user can be setup on the web app after the first visit to http://localhost:9000
     volumes:
       - ./uploads:/listmonk/uploads:rw                        # Mount an uploads directory on the host to /listmonk/uploads inside the container.
-                                                              # To use this, change directory path in Admin -> Settings -> Media to /listmonk/uploads
-
+      #                                                         # To use this, change directory path in Admin -> Settings -> Media to /listmonk/uploads
+      - ./config.toml:/listmonk/config.toml                     # Mount a custom config.toml file to /listmonk/conf.toml inside the container.
+  
+  
   # Postgres database
-  db:
-    image: postgres:17-alpine
-    container_name: listmonk_db
-    restart: unless-stopped
-    ports:
-      - "5432:5432"
-    networks:
-      - listmonk
-    environment:
-      <<: *db-credentials
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U listmonk"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-    volumes:
-      - type: volume
-        source: listmonk-data
-        target: /var/lib/postgresql/data
+  # db:
+  #   image: postgres:latest
+  #   container_name: listmonk_db
+  #   hostname: listmonk_db
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5433:5432"
+  #   networks:
+  #     - listmonk
+  #   environment:
+  #     <<: *db-credentials
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U listmonk"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 6
+  #   volumes:
+  #     - ./listmonk-data:/var/lib/postgresql/data
 
+
+  db:
+    container_name: listmonk_db
+    hostname: listmonk_db
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: listmonk_user
+      POSTGRES_PASSWORD: "listM0nk$$8"
+      POSTGRES_DB: listmonk_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    #- ./logs:/var/log/pg_db_server
+    networks:
+      listmonk:
+ 
+
+  nginx:
+    container_name: nginx
+    hostname: 'nginx'
+    restart: always
+    image: "nginx:latest"
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - .:/usr/src/app/
+      - ./nginx/logs:/var/log/nginx/ 
+    networks:
+      listmonk:
+ 
+    ports:
+      - 87:80
+      # - 443:443
+    depends_on: 
+      - listmonk_app  
+
+    links:
+      - listmonk_app
+  # certbot_app:
+  #   container_name: certbot_app
+  #   hostname: 'certbot_app'
+  #   image: certbot/certbot
+  #   volumes: 
+  #     - ./data/certbot/conf:/etc/letsencrypt
+  #     - ./data/certbot/www:/var/www/certbot
+  #   #- ./logs:/var/log/certbot_server
+  #   entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 48h & wait $${!}; done;'"
+  #   depends_on: 
+  #     - proxy_server
+  #     - web_server  
+  #   networks:
+  #     reverse-proxy:
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"  # Maximum size of a log file before rotation
+  #       max-file: "3"    # Number of rotated log files to keep
+  
 networks:
   listmonk:
 
-volumes:
-  listmonk-data:
+ 

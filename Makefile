@@ -20,7 +20,7 @@ FRONTEND_DEPS = \
 	$(shell find frontend/fontello frontend/public frontend/src -type f)
 
 BIN := listmonk
-STATIC := config.toml.sample \
+STATIC := config.toml \
 	schema.sql queries.sql permissions.json \
 	static/public:/public \
 	static/email-templates \
